@@ -2,793 +2,598 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
-<title>Focus</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Due Board — Vendor Work Orders</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <style>
   :root{
-    --paper:#EFF3ED;
-    --card:#FFFFFF;
-    --ink:#1F2A24;
-    --ink-soft:#5B6B62;
-    --moss:#3E6259;
-    --moss-dim:#E4EBE6;
-    --amber:#E8A33D;
-    --amber-dim:#FBEBD3;
-    --clay:#C97B5C;
-    --clay-dim:#F5E3DB;
-    --line:#DAE2D8;
-    --radius:14px;
+    --paper:#F5F2EC;
+    --paper-deep:#EDE8DE;
+    --ink:#242220;
+    --ink-soft:#5C5650;
+    --line:#D8D0C2;
+    --ok:#3E5C55;
+    --ok-bg:#E4EAE6;
+    --warn:#B0701E;
+    --warn-bg:#F4E6CE;
+    --crit:#A6392F;
+    --crit-bg:#F3DCD8;
+    --done:#8C8578;
   }
-  *{box-sizing:border-box;margin:0;padding:0;}
-  html,body{height:100%;}
+  *{box-sizing:border-box;}
   body{
+    margin:0;
     background:var(--paper);
     color:var(--ink);
-    font-family:'Work Sans',sans-serif;
+    font-family:'IBM Plex Sans',sans-serif;
     -webkit-font-smoothing:antialiased;
-    min-height:100vh;
-    padding-bottom:60px;
   }
-  h1,h2,h3,.display{font-family:'Fraunces',serif;}
-  .mono{font-family:'IBM Plex Mono',monospace;}
+  .wrap{max-width:640px;margin:0 auto;padding:28px 20px 80px;}
 
-  /* ---------- Header ---------- */
-  header{
-    display:flex;align-items:center;justify-content:space-between;
-    padding:20px clamp(16px,4vw,40px) 14px;
-    gap:16px;flex-wrap:wrap;
+  header{margin-bottom:26px;}
+  .kicker{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    letter-spacing:.04em;
+    color:var(--ink-soft);
+    margin:0 0 4px;
   }
-  .wordmark{display:flex;align-items:baseline;gap:8px;}
-  .wordmark h1{font-size:1.7rem;font-weight:700;letter-spacing:-0.01em;color:var(--ink);}
-  .wordmark span{font-size:.72rem;color:var(--ink-soft);letter-spacing:.08em;text-transform:uppercase;}
+  h1{
+    font-family:'Zilla Slab',serif;
+    font-weight:700;
+    font-size:32px;
+    margin:0;
+    letter-spacing:-.01em;
+  }
 
-  .ring-wrap{display:flex;align-items:center;gap:10px;cursor:default;}
-  .ring-wrap svg{transform:rotate(-90deg);}
-  .ring-label{display:flex;flex-direction:column;line-height:1.15;}
-  .ring-label b{font-size:1.05rem;}
-  .ring-label small{color:var(--ink-soft);font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;}
+  .summary{
+    display:flex;
+    gap:10px;
+    margin:20px 0 26px;
+    flex-wrap:wrap;
+  }
+  .pill{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:13px;
+    padding:6px 12px;
+    border-radius:3px;
+    border:1px solid var(--line);
+    background:#fff;
+  }
+  .pill b{font-family:'Zilla Slab',serif;font-size:15px;margin-right:4px;}
+  .pill.crit{border-color:var(--crit);color:var(--crit);}
+  .pill.warn{border-color:var(--warn);color:var(--warn);}
 
-  nav.tabs{
-    display:flex;gap:6px;padding:0 clamp(16px,4vw,40px);
-    border-bottom:1px solid var(--line);
+  form.new-wo{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:18px;
+    margin-bottom:30px;
   }
-  nav.tabs button{
-    background:none;border:none;font-family:'Work Sans',sans-serif;
-    font-size:.92rem;font-weight:600;color:var(--ink-soft);
-    padding:10px 14px;cursor:pointer;border-bottom:2px solid transparent;
-    transition:color .15s, border-color .15s;
+  form.new-wo .row{display:flex;gap:10px;margin-bottom:10px;}
+  form.new-wo .row:last-of-type{margin-bottom:0;}
+  label{
+    display:block;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--ink-soft);
+    margin-bottom:4px;
   }
-  nav.tabs button.active{color:var(--moss);border-color:var(--moss);}
-  nav.tabs button:hover{color:var(--ink);}
+  input, textarea, select{
+    width:100%;
+    font-family:'IBM Plex Sans',sans-serif;
+    font-size:14px;
+    padding:8px 10px;
+    border:1px solid var(--line);
+    border-radius:3px;
+    background:var(--paper);
+    color:var(--ink);
+  }
+  input:focus, textarea:focus, select:focus{
+    outline:none;
+    border-color:var(--ink-soft);
+  }
+  textarea{resize:vertical;min-height:44px;}
+  .field{flex:1;}
+  .field.narrow{flex:0 0 130px;}
 
-  main{padding:22px clamp(16px,4vw,40px) 0;max-width:760px;margin:0 auto;}
-
-  /* ---------- Quick add ---------- */
-  .quickadd{
-    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
-    padding:14px;display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;
-    box-shadow:0 1px 2px rgba(31,42,36,.04);
-  }
-  .quickadd input[type=text]{
-    flex:1 1 200px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;
-    font-family:'Work Sans',sans-serif;font-size:.95rem;background:var(--paper);color:var(--ink);
-  }
-  .quickadd select{
-    border:1px solid var(--line);border-radius:10px;padding:10px;font-size:.85rem;
-    background:var(--paper);color:var(--ink);font-family:'Work Sans',sans-serif;
-  }
-  .quickadd button{
-    background:var(--moss);color:#fff;border:none;border-radius:10px;padding:10px 18px;
-    font-weight:600;font-size:.9rem;cursor:pointer;transition:opacity .15s;
-  }
-  .quickadd button:hover{opacity:.88;}
-
-  /* ---------- Task list ---------- */
-  .task{
-    background:var(--card);border:1px solid var(--line);border-radius:12px;
-    padding:12px 14px;display:flex;align-items:flex-start;gap:12px;margin-bottom:8px;
-    transition:opacity .3s, transform .3s;
-  }
-  .task.urgent{border-left:3px solid var(--clay);}
-  .task .check{
-    width:22px;height:22px;border-radius:50%;border:2px solid var(--moss);
-    flex-shrink:0;cursor:pointer;margin-top:2px;display:flex;align-items:center;justify-content:center;
-    background:none;transition:background .15s;
-  }
-  .task .check.done{background:var(--moss);}
-  .task .check.done::after{content:'✓';color:#fff;font-size:.75rem;}
-  .task-body{flex:1;min-width:0;}
-  .task-title{font-weight:600;font-size:.97rem;word-break:break-word;}
-  .task.done .task-title{text-decoration:line-through;color:var(--ink-soft);}
-  .task-meta{display:flex;gap:6px;margin-top:5px;flex-wrap:wrap;}
-  .chip{
-    font-size:.68rem;padding:3px 9px;border-radius:20px;font-weight:600;
-    text-transform:uppercase;letter-spacing:.03em;
-  }
-  .chip.cat{background:var(--moss-dim);color:var(--moss);}
-  .chip.urgent{background:var(--clay-dim);color:var(--clay);}
-  .chip.due{background:var(--amber-dim);color:#8a5c14;}
-  .task .del{
-    background:none;border:none;color:var(--ink-soft);cursor:pointer;font-size:1rem;
-    padding:4px;flex-shrink:0;
-  }
-  .task .del:hover{color:var(--clay);}
-  .empty-state{
-    text-align:center;padding:40px 20px;color:var(--ink-soft);
-  }
-  .empty-state b{display:block;color:var(--ink);font-family:'Fraunces',serif;font-size:1.2rem;margin-bottom:6px;}
-
-  /* ---------- Focus mode ---------- */
-  .focus-panel{
-    background:var(--card);border:1px solid var(--line);border-radius:20px;
-    padding:36px 24px;text-align:center;margin-bottom:20px;
-  }
-  .focus-panel .eyebrow{
-    font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-soft);font-weight:600;
-  }
-  .focus-task-title{font-family:'Fraunces',serif;font-size:1.7rem;font-weight:600;margin:10px 0 24px;}
-  .timer-ring-wrap{position:relative;width:220px;height:220px;margin:0 auto 22px;}
-  .timer-time{
-    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-    font-family:'IBM Plex Mono',monospace;font-size:2.4rem;font-weight:500;
-  }
-  .timer-controls{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
-  .timer-controls button{
-    border:1px solid var(--line);background:var(--paper);color:var(--ink);
-    border-radius:10px;padding:10px 18px;font-weight:600;font-size:.88rem;cursor:pointer;
-  }
-  .timer-controls button.primary{background:var(--moss);color:#fff;border-color:var(--moss);}
-  .timer-controls button.done{background:var(--amber);color:#3a2400;border-color:var(--amber);}
-  .focus-length{margin-top:16px;color:var(--ink-soft);font-size:.82rem;}
-  .focus-length input{width:52px;text-align:center;border:1px solid var(--line);border-radius:6px;padding:4px;font-family:'IBM Plex Mono',monospace;}
-  .focus-pick{display:flex;flex-direction:column;gap:8px;margin-top:6px;}
-  .focus-pick button{
-    text-align:left;background:var(--paper);border:1px solid var(--line);border-radius:10px;
-    padding:12px 14px;font-family:'Work Sans',sans-serif;font-size:.9rem;font-weight:500;cursor:pointer;color:var(--ink);
-  }
-  .focus-pick button:hover{border-color:var(--moss);}
-
-  /* ---------- Clean tab ---------- */
-  .clean-overall{margin-bottom:18px;}
-  .bar{height:8px;border-radius:6px;background:var(--line);overflow:hidden;}
-  .bar > div{height:100%;background:var(--moss);transition:width .3s;}
-  .clean-overall-label{display:flex;justify-content:space-between;font-size:.82rem;color:var(--ink-soft);margin-bottom:6px;}
-  .reset-btn{
-    background:none;border:1px solid var(--line);border-radius:8px;padding:6px 12px;
-    font-size:.78rem;font-weight:600;color:var(--ink-soft);cursor:pointer;margin-bottom:18px;
-  }
-  .room-card{
-    background:var(--card);border:1px solid var(--line);border-radius:14px;
-    margin-bottom:12px;overflow:hidden;
-  }
-  .room-head{
-    display:flex;align-items:center;justify-content:space-between;padding:14px 16px;
+  button{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:13px;
+    letter-spacing:.02em;
+    padding:10px 16px;
+    border-radius:3px;
+    border:1px solid var(--ink);
+    background:var(--ink);
+    color:var(--paper);
     cursor:pointer;
   }
-  .room-head h3{font-size:1.05rem;font-weight:600;font-family:'Work Sans',sans-serif;}
-  .room-head .pct{font-family:'IBM Plex Mono',monospace;font-size:.82rem;color:var(--moss);}
-  .room-bar{height:5px;background:var(--line);}
-  .room-bar > div{height:100%;background:var(--amber);transition:width .3s;}
-  .room-items{padding:4px 16px 14px;display:none;}
-  .room-items.open{display:block;}
-  .clean-item{display:flex;align-items:center;gap:10px;padding:7px 0;font-size:.9rem;}
-  .clean-item .cbox{
-    width:18px;height:18px;border-radius:5px;border:2px solid var(--moss);flex-shrink:0;cursor:pointer;
-    display:flex;align-items:center;justify-content:center;
+  button:hover{opacity:.85;}
+  button.ghost{
+    background:transparent;
+    color:var(--ink-soft);
+    border-color:var(--line);
   }
-  .clean-item .cbox.done{background:var(--moss);}
-  .clean-item .cbox.done::after{content:'✓';color:#fff;font-size:.65rem;}
-  .clean-item span.label.done{text-decoration:line-through;color:var(--ink-soft);}
+  button.small{padding:5px 10px;font-size:12px;}
 
-  /* ---------- Setup banner ---------- */
-  .setup-banner{
-    background:var(--clay-dim);border:1px solid var(--clay);color:#6b3a24;
-    border-radius:12px;padding:16px 18px;margin:18px clamp(16px,4vw,40px);font-size:.88rem;line-height:1.5;
+  .ticket-list{display:flex;flex-direction:column;gap:10px;}
+  .ticket{
+    position:relative;
+    background:#fff;
+    border:1px solid var(--line);
+    border-left-width:5px;
+    border-radius:3px;
+    padding:14px 16px;
   }
-  .setup-banner code{background:rgba(0,0,0,.06);padding:1px 5px;border-radius:4px;}
+  .ticket.status-ok{border-left-color:var(--ok);}
+  .ticket.status-warn{border-left-color:var(--warn);}
+  .ticket.status-crit{border-left-color:var(--crit);}
+  .ticket.status-done{border-left-color:var(--done);opacity:.55;}
 
-  #confetti-canvas{position:fixed;inset:0;pointer-events:none;z-index:99;}
+  .ticket-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px;}
+  .vendor{
+    font-family:'Zilla Slab',serif;
+    font-weight:600;
+    font-size:18px;
+  }
+  .wo-num{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    color:var(--ink-soft);
+  }
+  .due{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    white-space:nowrap;
+  }
+  .status-ok .due{color:var(--ok);}
+  .status-warn .due{color:var(--warn);}
+  .status-crit .due{color:var(--crit);}
+  .status-done .due{color:var(--done);}
 
-  /* ---------- Auth screen ---------- */
-  #auth-screen{
-    min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;
-  }
-  .auth-card{
-    background:var(--card);border:1px solid var(--line);border-radius:20px;
-    padding:36px 30px;max-width:360px;width:100%;box-shadow:0 4px 18px rgba(31,42,36,.06);
-  }
-  .auth-card h1{font-size:1.7rem;margin-bottom:4px;}
-  .auth-card .sub{color:var(--ink-soft);font-size:.88rem;margin-bottom:22px;}
-  .auth-card label{display:block;font-size:.8rem;font-weight:600;color:var(--ink-soft);margin:14px 0 5px;}
-  .auth-card input{
-    width:100%;border:1px solid var(--line);border-radius:10px;padding:10px 12px;
-    font-family:'Work Sans',sans-serif;font-size:.95rem;background:var(--paper);color:var(--ink);
-  }
-  .auth-card button.primary-btn{
-    width:100%;background:var(--moss);color:#fff;border:none;border-radius:10px;padding:11px;
-    font-weight:600;font-size:.92rem;cursor:pointer;margin-top:20px;
-  }
-  .auth-card button.primary-btn:hover{opacity:.9;}
-  .auth-switch{text-align:center;margin-top:16px;font-size:.85rem;color:var(--ink-soft);}
-  .auth-switch button{background:none;border:none;color:var(--moss);font-weight:600;cursor:pointer;font-size:.85rem;}
-  .auth-msg{font-size:.83rem;margin-top:14px;padding:10px 12px;border-radius:8px;display:none;}
-  .auth-msg.error{background:var(--clay-dim);color:#6b3a24;display:block;}
-  .auth-msg.success{background:var(--moss-dim);color:var(--moss);display:block;}
-  .logout-btn{
-    background:none;border:1px solid var(--line);border-radius:8px;padding:6px 12px;
-    font-size:.78rem;font-weight:600;color:var(--ink-soft);cursor:pointer;
-  }
-  .user-row{display:flex;align-items:center;gap:10px;}
-  .user-email{font-size:.78rem;color:var(--ink-soft);}
+  .desc{font-size:14px;color:var(--ink-soft);margin:6px 0 10px;line-height:1.4;}
+  .ticket-actions{display:flex;gap:8px;}
 
-  @media (max-width:480px){
-    .wordmark h1{font-size:1.4rem;}
-    .ring-wrap svg{width:44px;height:44px;}
+  .empty{
+    text-align:center;
+    padding:50px 20px;
+    color:var(--ink-soft);
+    font-family:'Zilla Slab',serif;
+    font-size:18px;
+    border:1px dashed var(--line);
+    border-radius:4px;
   }
+
+  details.settings{
+    margin-top:36px;
+    border-top:1px solid var(--line);
+    padding-top:16px;
+  }
+  details.settings summary{
+    cursor:pointer;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    color:var(--ink-soft);
+  }
+  .settings-body{margin-top:14px;display:flex;flex-direction:column;gap:12px;}
+  .settings-body .row{display:flex;gap:10px;}
+  .save-msg{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ok);min-height:16px;}
+
+  .mapping{display:flex;flex-direction:column;gap:8px;margin:12px 0;}
+  .mapping-row{display:flex;align-items:center;gap:10px;}
+  .mapping-row span{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    color:var(--ink-soft);
+    width:110px;
+    flex-shrink:0;
+  }
+  .import-preview{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    color:var(--ink-soft);
+    margin:6px 0;
+  }
+  textarea.paste-box{min-height:90px;font-family:'IBM Plex Mono',monospace;font-size:12px;}
+
+  .conn-gate{
+    max-width:480px;
+    margin:80px auto;
+    padding:24px;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:4px;
+  }
+  .conn-gate p{font-size:14px;color:var(--ink-soft);line-height:1.5;}
 </style>
 </head>
 <body>
 
-<canvas id="confetti-canvas"></canvas>
-
-<div id="setup-banner-slot"></div>
-
-<!-- AUTH SCREEN -->
-<div id="auth-screen" style="display:none;">
-  <div class="auth-card">
-    <h1 class="display" id="auth-title">Welcome back</h1>
-    <div class="sub" id="auth-sub">Log in to your Focus account.</div>
-
-    <label for="auth-email">Email</label>
-    <input type="email" id="auth-email" autocomplete="email" placeholder="you@example.com">
-
-    <label for="auth-password">Password</label>
-    <input type="password" id="auth-password" autocomplete="current-password" placeholder="At least 6 characters">
-
-    <button class="primary-btn" id="auth-submit">Log in</button>
-    <div class="auth-msg" id="auth-msg"></div>
-
-    <div class="auth-switch">
-      <span id="auth-switch-text">Don't have an account?</span>
-      <button id="auth-switch-btn">Sign up</button>
-    </div>
+<div id="gate" class="wrap" style="display:none;">
+  <div class="conn-gate">
+    <p class="kicker">SETUP REQUIRED</p>
+    <h1 style="font-size:22px;">Connect Supabase</h1>
+    <p>Open this file, find the <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code> constants near the top of the script, and fill in your project's values. See the setup guide for the SQL to run first.</p>
   </div>
 </div>
 
-<!-- APP SHELL -->
-<div id="app-shell" style="display:none;">
+<div id="app" class="wrap" style="display:none;">
+  <header>
+    <p class="kicker">DUE BOARD</p>
+    <h1>Vendor Work Orders</h1>
+  </header>
 
-<header>
-  <div class="wordmark">
-    <h1>Focus</h1>
-    <span>Brain dump · timer · clean</span>
-  </div>
-  <div class="user-row">
-    <div class="ring-wrap">
-      <svg width="52" height="52" viewBox="0 0 52 52">
-        <circle cx="26" cy="26" r="22" fill="none" stroke="var(--line)" stroke-width="5"/>
-        <circle id="streak-ring" cx="26" cy="26" r="22" fill="none" stroke="var(--amber)" stroke-width="5"
-          stroke-linecap="round" stroke-dasharray="138.2" stroke-dashoffset="138.2"/>
-      </svg>
-      <div class="ring-label">
-        <b id="streak-count" class="mono">0</b>
-        <small>day streak</small>
+  <div class="summary" id="summary"></div>
+
+  <details class="settings" id="importSection">
+    <summary>Import from Maximo export</summary>
+    <div class="settings-body">
+      <div>
+        <label for="importFile">Upload the export file (.csv)</label>
+        <input type="file" id="importFile" accept=".csv,text/csv">
+      </div>
+      <div>
+        <label for="pasteBox">...or paste the exported rows directly (including the header row)</label>
+        <textarea id="pasteBox" class="paste-box" placeholder="Paste tab- or comma-separated rows here"></textarea>
+        <button type="button" class="ghost small" id="parsePasted" style="margin-top:6px;">Parse pasted rows</button>
+      </div>
+
+      <div id="mappingArea" style="display:none;">
+        <p class="import-preview" id="previewCount"></p>
+        <div class="mapping">
+          <div class="mapping-row"><span>Vendor</span><select id="mapVendor"></select></div>
+          <div class="mapping-row"><span>WO number</span><select id="mapWoNumber"></select></div>
+          <div class="mapping-row"><span>Description</span><select id="mapDescription"></select></div>
+          <div class="mapping-row"><span>Due date</span><select id="mapDueDate"></select></div>
+        </div>
+        <button type="button" id="runImportBtn">Import work orders</button>
+        <span class="save-msg" id="importMsg"></span>
       </div>
     </div>
-    <button class="logout-btn" id="logout-btn">Log out</button>
-  </div>
-</header>
+  </details>
 
-<nav class="tabs">
-  <button data-tab="dump" class="active">Brain Dump</button>
-  <button data-tab="focus">Focus</button>
-  <button data-tab="clean">Clean</button>
-</nav>
-
-<main>
-
-  <!-- DUMP TAB -->
-  <section id="tab-dump">
-    <div class="quickadd">
-      <input type="text" id="new-title" placeholder="What's on your mind? Type it and hit Add." />
-      <select id="new-priority">
-        <option value="low">Low</option>
-        <option value="normal" selected>Normal</option>
-        <option value="urgent">🔥 Urgent</option>
-      </select>
-      <select id="new-category">
-        <option value="general">General</option>
-        <option value="work">Work</option>
-        <option value="home">Home</option>
-        <option value="health">Health</option>
-        <option value="errands">Errands</option>
-      </select>
-      <button id="add-btn">Add</button>
-    </div>
-    <div id="task-list"></div>
-  </section>
-
-  <!-- FOCUS TAB -->
-  <section id="tab-focus" style="display:none;">
-    <div class="focus-panel" id="focus-panel"></div>
-  </section>
-
-  <!-- CLEAN TAB -->
-  <section id="tab-clean" style="display:none;">
-    <div class="clean-overall">
-      <div class="clean-overall-label">
-        <span>Overall progress</span>
-        <span id="clean-overall-pct" class="mono">0%</span>
+  <form class="new-wo" id="newWoForm">
+    <div class="row">
+      <div class="field">
+        <label for="vendor">Vendor</label>
+        <input id="vendor" required placeholder="e.g. Cintas, ABC Refrigeration">
       </div>
-      <div class="bar"><div id="clean-overall-bar" style="width:0%"></div></div>
+      <div class="field narrow">
+        <label for="woNumber">WO #</label>
+        <input id="woNumber" placeholder="optional">
+      </div>
     </div>
-    <button class="reset-btn" id="reset-clean-btn">Reset all rooms for this week</button>
-    <div id="rooms-list"></div>
-  </section>
+    <div class="row">
+      <div class="field">
+        <label for="description">What's the work</label>
+        <textarea id="description" placeholder="e.g. Replace compressor on dairy case 3"></textarea>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field narrow">
+        <label for="dueDate">Due date</label>
+        <input type="date" id="dueDate" required>
+      </div>
+      <div class="field" style="display:flex;align-items:flex-end;">
+        <button type="submit">Add to board</button>
+      </div>
+    </div>
+  </form>
 
-</main>
+  <div class="ticket-list" id="ticketList"></div>
+  <div class="empty" id="emptyState" style="display:none;">Board's clear. Add a work order above.</div>
 
-</div><!-- /app-shell -->
+  <details class="settings">
+    <summary>Alert settings</summary>
+    <div class="settings-body">
+      <div class="row">
+        <div class="field">
+          <label for="phoneNumber">SMS gateway address (e.g. 3185551234@vtext.com for Verizon)</label>
+          <input id="phoneNumber" placeholder="yournumber@vtext.com">
+        </div>
+        <div class="field narrow">
+          <label for="leadDays">Alert this many days before due</label>
+          <input type="number" id="leadDays" min="0" value="2">
+        </div>
+      </div>
+      <div class="row">
+        <button type="button" class="ghost small" id="saveSettings">Save alert settings</button>
+        <span class="save-msg" id="saveMsg"></span>
+      </div>
+      <p style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft);">
+        Texts are sent by a scheduled Supabase function, not by this page — it only needs to run once a day, whether or not your phone has this open.
+      </p>
+    </div>
+  </details>
+</div>
 
 <script>
-/* ============================================================
-   1. SUPABASE SETUP
-   Go to your Supabase project → Settings → API and paste in:
-   - Project URL
-   - anon / public key
-   These are safe to expose in a public static site; your Row
-   Level Security policies (from supabase_setup.sql) control access.
-   ============================================================ */
-const SUPABASE_URL = 'https://hbpmwfhwsgacstauwdbi.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_b8USqfr1YjsSivGpksvWgA_i51lutSU';
+  // ---- Fill these in from your Supabase project (Project Settings → API) ----
+  const SUPABASE_URL = "https://tcfddlmzvmcpkwnbdmzw.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_tuIuQp5bOO3rmXs1_x950w_YJdxduzg";
+  // ----------------------------------------------------------------------------
 
-let supa = null;
-let configured = SUPABASE_URL.startsWith('http') && SUPABASE_ANON_KEY.length > 20;
-if (configured) {
-  supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-} else {
-  document.getElementById('setup-banner-slot').innerHTML = `
-    <div class="setup-banner">
-      <b>One-time setup needed.</b> Open this file, find the <code>SUPABASE_URL</code> and
-      <code>SUPABASE_ANON_KEY</code> lines near the top of the &lt;script&gt;, and paste in your
-      Supabase project's URL and anon key (Supabase dashboard → Settings → API). Then run
-      <code>supabase_setup.sql</code> once in the Supabase SQL editor to create the tables.
-    </div>`;
-}
-
-/* ============================================================
-   2. STATE
-   ============================================================ */
-let tasks = [];
-let cleaning = [];
-let timer = { running:false, remaining:25*60, length:25, interval:null, taskId:null };
-let currentUser = null;
-let authMode = 'login'; // 'login' | 'signup'
-
-const DEFAULT_ROOMS = [
-  ['Kitchen',['Wipe counters','Clean stovetop','Empty dish rack / load dishwasher','Wipe table','Sweep floor','Take out trash','Clean sink']],
-  ['Bathroom',['Wipe counters','Clean toilet','Clean sink','Wipe mirror','Sweep / mop floor','Replace towels']],
-  ['Bedroom',['Make bed','Put away clothes','Dust surfaces','Vacuum floor','Empty trash']],
-  ['Living Room',['Fluff / straighten pillows','Dust surfaces','Vacuum floor','Tidy clutter','Wipe down electronics']],
-  ['Dining Room',['Wipe table','Straighten chairs','Sweep / vacuum floor','Dust surfaces']],
-  ['Sunroom',['Wipe down furniture','Sweep / vacuum floor','Clean windows','Water plants']],
-  ['Laundry',['Start a load','Fold and put away clean clothes','Wipe down machines','Sweep floor']],
-  ['Entryway',['Put away shoes','Straighten coats / bags','Sweep floor','Clear mail / clutter']],
-];
-
-/* ============================================================
-   2b. AUTH
-   ============================================================ */
-if (configured) {
-  supa.auth.onAuthStateChange((_event, session) => {
-    currentUser = session ? session.user : null;
-    if (currentUser) {
-      document.getElementById('auth-screen').style.display = 'none';
-      document.getElementById('app-shell').style.display = 'block';
-      initAfterLogin();
-    } else {
-      document.getElementById('app-shell').style.display = 'none';
-      document.getElementById('auth-screen').style.display = 'flex';
-    }
-  });
-}
-
-async function initAfterLogin(){
-  await ensureCleaningSeed();
-  loadTasks();
-  loadCleaning();
-}
-
-async function ensureCleaningSeed(){
-  const {count} = await supa.from('cleaning_tasks').select('*', {count:'exact', head:true});
-  if (count && count > 0) return;
-  const rows = [];
-  DEFAULT_ROOMS.forEach(([room, items])=>{
-    items.forEach((task_name, i)=>{
-      rows.push({ room, task_name, sort_order: i+1, user_id: currentUser.id });
-    });
-  });
-  await supa.from('cleaning_tasks').insert(rows);
-}
-
-function setAuthMode(mode){
-  authMode = mode;
-  document.getElementById('auth-title').textContent = mode==='login' ? 'Welcome back' : 'Create your account';
-  document.getElementById('auth-sub').textContent = mode==='login' ? 'Log in to your Focus account.' : 'Set up a new Focus account.';
-  document.getElementById('auth-submit').textContent = mode==='login' ? 'Log in' : 'Sign up';
-  document.getElementById('auth-switch-text').textContent = mode==='login' ? "Don't have an account?" : 'Already have an account?';
-  document.getElementById('auth-switch-btn').textContent = mode==='login' ? 'Sign up' : 'Log in';
-  document.getElementById('auth-msg').style.display = 'none';
-}
-
-document.getElementById('auth-switch-btn').addEventListener('click', ()=> setAuthMode(authMode==='login'?'signup':'login'));
-
-document.getElementById('auth-submit').addEventListener('click', async ()=>{
-  if(!configured) return;
-  const email = document.getElementById('auth-email').value.trim();
-  const password = document.getElementById('auth-password').value;
-  const msg = document.getElementById('auth-msg');
-  msg.className = 'auth-msg';
-  if(!email || password.length < 6){
-    msg.textContent = 'Enter a valid email and a password of at least 6 characters.';
-    msg.classList.add('error'); msg.style.display='block';
-    return;
-  }
-  if(authMode==='login'){
-    const {error} = await supa.auth.signInWithPassword({email, password});
-    if(error){ msg.textContent = error.message; msg.classList.add('error'); msg.style.display='block'; }
+  let supabase;
+  if (!SUPABASE_URL.startsWith("http")) {
+    document.getElementById('gate').style.display = 'block';
   } else {
-    const {error} = await supa.auth.signUp({email, password});
-    if(error){
-      msg.textContent = error.message; msg.classList.add('error'); msg.style.display='block';
-    } else {
-      msg.textContent = 'Account created! Check your email to confirm, then log in.';
-      msg.classList.add('success'); msg.style.display='block';
-      setAuthMode('login');
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    document.getElementById('app').style.display = 'block';
+    init();
+  }
+
+  function daysUntil(dateStr){
+    const today = new Date(); today.setHours(0,0,0,0);
+    const due = new Date(dateStr + 'T00:00:00');
+    return Math.round((due - today) / 86400000);
+  }
+
+  function statusFor(dueDate, status){
+    if (status === 'completed' || status === 'cancelled') return 'done';
+    const d = daysUntil(dueDate);
+    if (d < 0) return 'crit';
+    if (d <= 2) return 'crit';
+    if (d <= 5) return 'warn';
+    return 'ok';
+  }
+
+  function dueLabel(dueDate, status){
+    if (status === 'completed') return 'Completed';
+    if (status === 'cancelled') return 'Cancelled';
+    const d = daysUntil(dueDate);
+    if (d < 0) return `${Math.abs(d)} day${Math.abs(d)===1?'':'s'} overdue`;
+    if (d === 0) return 'Due today';
+    if (d === 1) return 'Due tomorrow';
+    return `Due in ${d} days`;
+  }
+
+  let parsedRows = [];
+  let parsedFields = [];
+
+  function guessColumn(fields, keywords){
+    const lower = fields.map(f => f.toLowerCase());
+    for (const kw of keywords){
+      const idx = lower.findIndex(f => f.includes(kw));
+      if (idx !== -1) return fields[idx];
     }
-  }
-});
-
-document.getElementById('logout-btn').addEventListener('click', async ()=>{
-  await supa.auth.signOut();
-});
-
-/* ============================================================
-   3. TABS
-   ============================================================ */
-document.querySelectorAll('nav.tabs button').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    ['dump','focus','clean'].forEach(t=>{
-      document.getElementById('tab-'+t).style.display = (t===btn.dataset.tab)?'block':'none';
-    });
-    if(btn.dataset.tab==='focus') renderFocus();
-  });
-});
-
-/* ============================================================
-   4. TASKS (Brain Dump)
-   ============================================================ */
-async function loadTasks(){
-  if(!configured) return;
-  const {data, error} = await supa.from('todo_tasks').select('*').order('created_at',{ascending:false});
-  if(!error) tasks = data || [];
-  renderTasks();
-  renderStreak();
-}
-
-function renderTasks(){
-  const list = document.getElementById('task-list');
-  const open = tasks.filter(t=>!t.completed).sort((a,b)=>{
-    const rank = {urgent:0, normal:1, low:2};
-    return rank[a.priority]-rank[b.priority];
-  });
-  const done = tasks.filter(t=>t.completed);
-  const all = [...open, ...done];
-
-  if(all.length===0){
-    list.innerHTML = `<div class="empty-state"><b>Nothing here yet</b>Type something above — get it out of your head and onto the list.</div>`;
-    return;
+    return '';
   }
 
-  list.innerHTML = all.map(t=>`
-    <div class="task ${t.priority==='urgent'?'urgent':''} ${t.completed?'done':''}" data-id="${t.id}">
-      <button class="check ${t.completed?'done':''}" data-action="toggle" data-id="${t.id}"></button>
-      <div class="task-body">
-        <div class="task-title">${escapeHtml(t.title)}</div>
-        <div class="task-meta">
-          <span class="chip cat">${t.category}</span>
-          ${t.priority==='urgent'?'<span class="chip urgent">Urgent</span>':''}
-          ${t.due_date?`<span class="chip due">${t.due_date}</span>`:''}
-        </div>
-      </div>
-      <button class="del" data-action="delete" data-id="${t.id}">✕</button>
-    </div>
-  `).join('');
-}
-
-function escapeHtml(s){
-  return s.replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-}
-
-document.getElementById('add-btn').addEventListener('click', addTask);
-document.getElementById('new-title').addEventListener('keydown', e=>{ if(e.key==='Enter') addTask(); });
-
-async function addTask(){
-  const titleEl = document.getElementById('new-title');
-  const title = titleEl.value.trim();
-  if(!title || !configured) return;
-  const priority = document.getElementById('new-priority').value;
-  const category = document.getElementById('new-category').value;
-  const {error} = await supa.from('todo_tasks').insert({title, priority, category});
-  if(!error){ titleEl.value=''; loadTasks(); }
-}
-
-document.getElementById('task-list').addEventListener('click', async e=>{
-  const btn = e.target.closest('button[data-action]');
-  if(!btn) return;
-  const id = btn.dataset.id;
-  if(btn.dataset.action==='toggle'){
-    const t = tasks.find(x=>x.id===id);
-    const completing = !t.completed;
-    await supa.from('todo_tasks').update({
-      completed: completing,
-      completed_at: completing ? new Date().toISOString() : null
-    }).eq('id', id);
-    if(completing) burstConfetti();
-    loadTasks();
-  } else if(btn.dataset.action==='delete'){
-    await supa.from('todo_tasks').delete().eq('id', id);
-    loadTasks();
+  function parseDateFlexible(str){
+    if (!str) return null;
+    str = str.trim();
+    let m = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+    m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+    if (m) {
+      let [, mo, da, yr] = m;
+      if (yr.length === 2) yr = (parseInt(yr, 10) > 50 ? '19' : '20') + yr;
+      return `${yr.padStart(4, '0')}-${mo.padStart(2, '0')}-${da.padStart(2, '0')}`;
+    }
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+    return null;
   }
-});
 
-/* ============================================================
-   5. STREAK
-   ============================================================ */
-function renderStreak(){
-  const doneDates = [...new Set(
-    tasks.filter(t=>t.completed && t.completed_at)
-         .map(t=> new Date(t.completed_at).toDateString())
-  )];
-  let streak = 0;
-  let cursor = new Date();
-  // if nothing done today yet, start counting from yesterday
-  if(!doneDates.includes(cursor.toDateString())) cursor.setDate(cursor.getDate()-1);
-  while(doneDates.includes(cursor.toDateString())){
-    streak++;
-    cursor.setDate(cursor.getDate()-1);
+  function showMapping(data, fields){
+    parsedRows = data;
+    parsedFields = fields;
+    document.getElementById('previewCount').textContent = `${data.length} row(s) found. Match each field to a column:`;
+
+    const selects = {
+      mapVendor: guessColumn(fields, ['vendor', 'contractor', 'supplier', 'company']),
+      mapWoNumber: guessColumn(fields, ['wonum', 'wo num', 'wo#', 'wo #', 'work order', 'number']),
+      mapDescription: guessColumn(fields, ['description', 'summary', 'desc']),
+      mapDueDate: guessColumn(fields, ['due', 'target finish', 'targcompdate', 'sched finish', 'need by', 'date']),
+    };
+
+    for (const [id, guess] of Object.entries(selects)){
+      const sel = document.getElementById(id);
+      sel.innerHTML = (id === 'mapWoNumber' || id === 'mapDescription' ? '<option value="">— none —</option>' : '')
+        + fields.map(f => `<option value="${escapeHtml(f)}" ${f === guess ? 'selected' : ''}>${escapeHtml(f)}</option>`).join('');
+    }
+
+    document.getElementById('mappingArea').style.display = 'block';
   }
-  document.getElementById('streak-count').textContent = streak;
-  const pct = Math.min(streak/7, 1); // ring fills over a 7-day view
-  const circumference = 138.2;
-  document.getElementById('streak-ring').style.strokeDashoffset = circumference - (circumference*pct);
-}
 
-/* ============================================================
-   6. FOCUS MODE
-   ============================================================ */
-function renderFocus(){
-  const panel = document.getElementById('focus-panel');
-  clearInterval(timer.interval);
-  timer.running = false;
+  async function runImport(){
+    const map = {
+      vendor: document.getElementById('mapVendor').value,
+      wo_number: document.getElementById('mapWoNumber').value,
+      description: document.getElementById('mapDescription').value,
+      due_date: document.getElementById('mapDueDate').value,
+    };
 
-  const currentTask = tasks.find(t=>t.id===timer.taskId && !t.completed);
+    const built = parsedRows.map(r => ({
+      vendor: (map.vendor && r[map.vendor]) ? r[map.vendor].trim() : '',
+      wo_number: (map.wo_number && r[map.wo_number]) ? r[map.wo_number].trim() : null,
+      description: (map.description && r[map.description]) ? r[map.description].trim() : null,
+      due_date: parseDateFlexible(map.due_date ? r[map.due_date] : ''),
+    })).filter(r => r.vendor && r.due_date);
 
-  if(!currentTask){
-    const open = tasks.filter(t=>!t.completed).sort((a,b)=>({urgent:0,normal:1,low:2}[a.priority]-{urgent:0,normal:1,low:2}[b.priority]));
-    if(open.length===0){
-      panel.innerHTML = `<div class="empty-state"><b>Nothing to focus on</b>Add something in Brain Dump first.</div>`;
+    const msg = document.getElementById('importMsg');
+    if (built.length === 0){
+      msg.textContent = 'No valid rows — check the column mapping.';
       return;
     }
-    panel.innerHTML = `
-      <div class="eyebrow">Pick a task</div>
-      <h2 class="display" style="margin:10px 0 18px;font-size:1.3rem;">What do you want to focus on?</h2>
-      <div class="focus-pick">
-        ${open.slice(0,6).map(t=>`<button data-id="${t.id}">${t.priority==='urgent'?'🔥 ':''}${escapeHtml(t.title)}</button>`).join('')}
-      </div>`;
-    panel.querySelectorAll('.focus-pick button').forEach(b=>{
-      b.addEventListener('click', ()=>{ timer.taskId=b.dataset.id; timer.remaining=timer.length*60; renderFocus(); });
-    });
-    return;
-  }
 
-  timer.remaining = timer.remaining ?? timer.length*60;
+    const woNumbers = built.filter(r => r.wo_number).map(r => r.wo_number);
+    let existingMap = {};
+    if (woNumbers.length){
+      const { data: existing } = await supabase.from('work_orders')
+        .select('wo_number, due_date, alerted, status').in('wo_number', woNumbers);
+      (existing || []).forEach(e => existingMap[e.wo_number] = e);
+    }
 
-  panel.innerHTML = `
-    <div class="eyebrow">Focused on</div>
-    <div class="focus-task-title">${escapeHtml(currentTask.title)}</div>
-    <div class="timer-ring-wrap">
-      <svg width="220" height="220" viewBox="0 0 220 220" style="transform:rotate(-90deg)">
-        <circle cx="110" cy="110" r="96" fill="none" stroke="var(--line)" stroke-width="10"/>
-        <circle id="focus-ring" cx="110" cy="110" r="96" fill="none" stroke="var(--moss)" stroke-width="10"
-          stroke-linecap="round" stroke-dasharray="603.2" stroke-dashoffset="0"/>
-      </svg>
-      <div class="timer-time mono" id="timer-display">${fmtTime(timer.remaining)}</div>
-    </div>
-    <div class="timer-controls">
-      <button class="primary" id="timer-toggle">${timer.running?'Pause':'Start'}</button>
-      <button id="timer-reset">Reset</button>
-      <button class="done" id="timer-complete">Mark done</button>
-      <button id="timer-switch">Switch task</button>
-    </div>
-    <div class="focus-length">Session length: <input type="number" min="1" max="90" id="focus-length-input" value="${timer.length}"> min</div>
-  `;
-
-  updateFocusRing();
-
-  document.getElementById('timer-toggle').addEventListener('click', toggleTimer);
-  document.getElementById('timer-reset').addEventListener('click', ()=>{
-    clearInterval(timer.interval); timer.running=false; timer.remaining=timer.length*60; renderFocus();
-  });
-  document.getElementById('timer-complete').addEventListener('click', async ()=>{
-    clearInterval(timer.interval); timer.running=false;
-    await supa.from('todo_tasks').update({completed:true, completed_at:new Date().toISOString()}).eq('id', currentTask.id);
-    burstConfetti();
-    timer.taskId = null; timer.remaining = null;
-    await loadTasks();
-    renderFocus();
-  });
-  document.getElementById('timer-switch').addEventListener('click', ()=>{
-    clearInterval(timer.interval); timer.running=false;
-    timer.taskId = null; timer.remaining = null; renderFocus();
-  });
-  document.getElementById('focus-length-input').addEventListener('change', e=>{
-    const v = Math.max(1, Math.min(90, parseInt(e.target.value)||25));
-    timer.length = v;
-    if(!timer.running) timer.remaining = v*60;
-    renderFocus();
-  });
-}
-
-function toggleTimer(){
-  if(timer.running){
-    clearInterval(timer.interval); timer.running=false;
-  } else {
-    timer.running=true;
-    timer.interval = setInterval(()=>{
-      timer.remaining--;
-      if(timer.remaining<=0){
-        clearInterval(timer.interval); timer.running=false; timer.remaining=0;
-        burstConfetti();
+    const finalRows = built.map(r => {
+      const ex = r.wo_number ? existingMap[r.wo_number] : null;
+      if (ex) {
+        const dueChanged = ex.due_date !== r.due_date;
+        return {
+          ...r,
+          status: (ex.status === 'completed' || ex.status === 'cancelled') ? ex.status : 'open',
+          alerted: dueChanged ? false : ex.alerted,
+        };
       }
-      document.getElementById('timer-display').textContent = fmtTime(timer.remaining);
-      updateFocusRing();
-      const toggleBtn = document.getElementById('timer-toggle');
-      if(toggleBtn) toggleBtn.textContent = timer.running?'Pause':'Start';
-    }, 1000);
-  }
-  const toggleBtn = document.getElementById('timer-toggle');
-  if(toggleBtn) toggleBtn.textContent = timer.running?'Pause':'Start';
-}
-
-function updateFocusRing(){
-  const ring = document.getElementById('focus-ring');
-  if(!ring) return;
-  const total = timer.length*60;
-  const pct = 1 - (timer.remaining/total);
-  const c = 603.2;
-  ring.style.strokeDashoffset = c - (c*pct);
-}
-
-function fmtTime(s){
-  const m = Math.floor(s/60), sec = s%60;
-  return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
-}
-
-/* ============================================================
-   7. CLEAN TAB
-   ============================================================ */
-async function loadCleaning(){
-  if(!configured) return;
-  const {data, error} = await supa.from('cleaning_tasks').select('*').order('room').order('sort_order');
-  if(!error) cleaning = data || [];
-  renderCleaning();
-}
-
-function renderCleaning(){
-  const roomsList = document.getElementById('rooms-list');
-  const rooms = [...new Set(cleaning.map(c=>c.room))];
-  if(rooms.length===0){
-    roomsList.innerHTML = `<div class="empty-state"><b>No checklist yet</b>Run supabase_setup.sql to seed your rooms.</div>`;
-    document.getElementById('clean-overall-pct').textContent='0%';
-    document.getElementById('clean-overall-bar').style.width='0%';
-    return;
-  }
-
-  const totalDone = cleaning.filter(c=>c.done).length;
-  const overallPct = Math.round((totalDone/cleaning.length)*100);
-  document.getElementById('clean-overall-pct').textContent = overallPct+'%';
-  document.getElementById('clean-overall-bar').style.width = overallPct+'%';
-
-  roomsList.innerHTML = rooms.map(room=>{
-    const items = cleaning.filter(c=>c.room===room);
-    const done = items.filter(c=>c.done).length;
-    const pct = Math.round((done/items.length)*100);
-    return `
-      <div class="room-card" data-room="${room}">
-        <div class="room-head" data-toggle="${room}">
-          <h3>${room}</h3>
-          <span class="pct mono">${done}/${items.length}</span>
-        </div>
-        <div class="room-bar"><div style="width:${pct}%"></div></div>
-        <div class="room-items" id="room-items-${cssSafe(room)}">
-          ${items.map(i=>`
-            <div class="clean-item">
-              <button class="cbox ${i.done?'done':''}" data-action="clean-toggle" data-id="${i.id}"></button>
-              <span class="label ${i.done?'done':''}">${escapeHtml(i.task_name)}</span>
-            </div>`).join('')}
-        </div>
-      </div>`;
-  }).join('');
-
-  roomsList.querySelectorAll('.room-head').forEach(h=>{
-    h.addEventListener('click', ()=>{
-      const el = document.getElementById('room-items-'+cssSafe(h.dataset.toggle));
-      el.classList.toggle('open');
+      return { ...r, status: 'open', alerted: false };
     });
-  });
-}
 
-function cssSafe(s){ return s.replace(/[^a-z0-9]/gi,'-'); }
+    const withNum = finalRows.filter(r => r.wo_number);
+    const withoutNum = finalRows.filter(r => !r.wo_number);
+    let hadError = false;
 
-document.getElementById('rooms-list').addEventListener('click', async e=>{
-  const btn = e.target.closest('button[data-action="clean-toggle"]');
-  if(!btn) return;
-  const item = cleaning.find(c=>c.id===btn.dataset.id);
-  await supa.from('cleaning_tasks').update({done: !item.done, done_at: !item.done ? new Date().toISOString() : null}).eq('id', item.id);
-  loadCleaning();
-});
+    if (withNum.length){
+      const { error } = await supabase.from('work_orders').upsert(withNum, { onConflict: 'wo_number' });
+      if (error) hadError = true;
+    }
+    if (withoutNum.length){
+      const { error } = await supabase.from('work_orders').insert(withoutNum);
+      if (error) hadError = true;
+    }
 
-document.getElementById('reset-clean-btn').addEventListener('click', async ()=>{
-  if(!configured) return;
-  if(!confirm('Reset all cleaning checkboxes for a fresh week?')) return;
-  await supa.from('cleaning_tasks').update({done:false, done_at:null}).neq('id','00000000-0000-0000-0000-000000000000');
-  loadCleaning();
-});
-
-/* ============================================================
-   8. CONFETTI
-   ============================================================ */
-function burstConfetti(){
-  const canvas = document.getElementById('confetti-canvas');
-  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-  const ctx = canvas.getContext('2d');
-  const colors = ['#3E6259','#E8A33D','#C97B5C','#8FB39C'];
-  const pieces = Array.from({length:80}, ()=>({
-    x: canvas.width/2, y: canvas.height/2,
-    vx: (Math.random()-0.5)*14, vy: (Math.random()-1.2)*14,
-    size: 4+Math.random()*4, color: colors[Math.floor(Math.random()*colors.length)],
-    rot: Math.random()*360, life:0
-  }));
-  function frame(){
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    let alive=false;
-    pieces.forEach(p=>{
-      p.vy += 0.35; p.x+=p.vx; p.y+=p.vy; p.rot+=8; p.life++;
-      if(p.life<90){
-        alive=true;
-        ctx.save();
-        ctx.translate(p.x,p.y); ctx.rotate(p.rot*Math.PI/180);
-        ctx.fillStyle=p.color; ctx.fillRect(-p.size/2,-p.size/2,p.size,p.size);
-        ctx.restore();
-      }
-    });
-    if(alive) requestAnimationFrame(frame);
-    else ctx.clearRect(0,0,canvas.width,canvas.height);
+    msg.textContent = hadError ? 'Some rows failed — check the browser console.' : `Imported ${built.length} row(s).`;
+    await loadOrders();
   }
-  frame();
-}
 
-/* ============================================================
-   9. INIT
-   Loading now happens automatically once a session is confirmed,
-   via the onAuthStateChange listener above.
-   ============================================================ */
+  async function init(){
+    await loadSettings();
+    await loadOrders();
+
+    document.getElementById('importFile').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      Papa.parse(file, {
+        header: true, skipEmptyLines: true,
+        complete: (results) => showMapping(results.data, results.meta.fields || []),
+      });
+    });
+
+    document.getElementById('parsePasted').addEventListener('click', () => {
+      const text = document.getElementById('pasteBox').value;
+      if (!text.trim()) return;
+      Papa.parse(text, {
+        header: true, skipEmptyLines: true,
+        complete: (results) => showMapping(results.data, results.meta.fields || []),
+      });
+    });
+
+    document.getElementById('runImportBtn').addEventListener('click', runImport);
+
+    document.getElementById('newWoForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const vendor = document.getElementById('vendor').value.trim();
+      const woNumber = document.getElementById('woNumber').value.trim();
+      const description = document.getElementById('description').value.trim();
+      const dueDate = document.getElementById('dueDate').value;
+      if (!vendor || !dueDate) return;
+
+      const { error } = await supabase.from('work_orders').insert({
+        vendor, wo_number: woNumber || null, description: description || null,
+        due_date: dueDate, status: 'open', alerted: false
+      });
+      if (error) { alert('Could not save: ' + error.message); return; }
+      e.target.reset();
+      await loadOrders();
+    });
+
+    document.getElementById('saveSettings').addEventListener('click', async () => {
+      const phone = document.getElementById('phoneNumber').value.trim();
+      const lead = parseInt(document.getElementById('leadDays').value, 10) || 0;
+      const { error } = await supabase.from('alert_settings')
+        .upsert({ id: 1, phone_number: phone, lead_days: lead });
+      const msg = document.getElementById('saveMsg');
+      msg.textContent = error ? ('Error: ' + error.message) : 'Saved.';
+      if (!error) setTimeout(() => msg.textContent = '', 2000);
+    });
+  }
+
+  async function loadSettings(){
+    const { data } = await supabase.from('alert_settings').select('*').eq('id', 1).maybeSingle();
+    if (data) {
+      document.getElementById('phoneNumber').value = data.phone_number || '';
+      document.getElementById('leadDays').value = data.lead_days ?? 2;
+    }
+  }
+
+  async function loadOrders(){
+    const { data, error } = await supabase.from('work_orders')
+      .select('*').order('due_date', { ascending: true });
+    if (error) { console.error(error); return; }
+    render(data || []);
+  }
+
+  async function markStatus(id, status){
+    await supabase.from('work_orders').update({ status }).eq('id', id);
+    await loadOrders();
+  }
+
+  async function removeOrder(id){
+    if (!confirm('Remove this work order from the board?')) return;
+    await supabase.from('work_orders').delete().eq('id', id);
+    await loadOrders();
+  }
+
+  function render(orders){
+    const list = document.getElementById('ticketList');
+    const empty = document.getElementById('emptyState');
+    const summary = document.getElementById('summary');
+
+    if (orders.length === 0) {
+      list.innerHTML = '';
+      empty.style.display = 'block';
+      summary.innerHTML = '';
+      return;
+    }
+    empty.style.display = 'none';
+
+    const open = orders.filter(o => o.status === 'open');
+    const critCount = open.filter(o => statusFor(o.due_date, o.status) === 'crit').length;
+    const warnCount = open.filter(o => statusFor(o.due_date, o.status) === 'warn').length;
+    summary.innerHTML = `
+      <div class="pill"><b>${open.length}</b>open</div>
+      ${critCount ? `<div class="pill crit"><b>${critCount}</b>due ≤2 days / overdue</div>` : ''}
+      ${warnCount ? `<div class="pill warn"><b>${warnCount}</b>due this week</div>` : ''}
+    `;
+
+    list.innerHTML = orders.map(o => {
+      const st = statusFor(o.due_date, o.status);
+      const dateFmt = new Date(o.due_date + 'T00:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric'});
+      return `
+        <div class="ticket status-${st}">
+          <div class="ticket-top">
+            <div>
+              <div class="vendor">${escapeHtml(o.vendor)}</div>
+              ${o.wo_number ? `<div class="wo-num">WO ${escapeHtml(o.wo_number)}</div>` : ''}
+            </div>
+            <div class="due">${dueLabel(o.due_date, o.status)} · ${dateFmt}</div>
+          </div>
+          ${o.description ? `<div class="desc">${escapeHtml(o.description)}</div>` : ''}
+          ${st !== 'done' ? `
+          <div class="ticket-actions">
+            <button class="ghost small" onclick="markStatus('${o.id}','completed')">Mark complete</button>
+            <button class="ghost small" onclick="removeOrder('${o.id}')">Remove</button>
+          </div>` : `
+          <div class="ticket-actions">
+            <button class="ghost small" onclick="removeOrder('${o.id}')">Remove</button>
+          </div>`}
+        </div>
+      `;
+    }).join('');
+  }
+
+  function escapeHtml(str){
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  // expose for inline onclick handlers
+  window.markStatus = markStatus;
+  window.removeOrder = removeOrder;
 </script>
 </body>
 </html>
